@@ -20,6 +20,8 @@ jobs:
             || curl -fL --retry 3 --connect-timeout 30 --max-time 600 -o out/vmlinuz "$BASE/vmlinuz"
           curl -fL --retry 3 --connect-timeout 30 --max-time 600 -o out/initrd.zst "$BASE/initrd.zst" \
             || curl -fL --retry 3 --connect-timeout 30 --max-time 600 -o out/initrd "$BASE/initrd"
+          # VM 内 Linux host
+          curl -fL --retry 3 --connect-timeout 30 --max-time 900 -o out/claude.zst "https://downloads.claude.ai/claude-code-releases/2.1.221/linux-x64/claude.zst"
           ls -lh out/
 
       - name: Verify checksums (downloaded + decompressed)
@@ -33,6 +35,7 @@ jobs:
             [ -f "$f" ] && zstd -d -f "$f" -o "plain_$f" 2>/dev/null && sha256sum "plain_$f" && rm -f "plain_$f"
           done
           echo "--- manifest expectations ---"
+          echo "claude.zst:  d8a43ae3cea71283d1d228937735c47f5b533829ce7a725ee081a5a72510ab41"
           echo "rootfs.vhdx: 21237ca86d15885ed7dcbe1c66b8b3a464c914648b16300070b12b1e1212e451"
           echo "vmlinuz:     1bb4bc3aa0c0c797a2ca6134d2b7034a196e05d4deea7bb20f064ee353781f3b"
           echo "initrd:      20214efcd451b3b74dc53ed80218c6e616bb2a101cafb18bc2c9bc91e559926b"
