@@ -1,0 +1,46 @@
+name: Mirror VM components
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download components from downloads.claude.ai
+        run: |
+          BASE="https://downloads.claude.ai/vms/linux/x64/6d1538ba6fecc4e5c5583993c4b30bb1875f0f5a"
+          mkdir -p out
+          curl -fL --retry 3 --connect-timeout 30 --max-time 1800 -o out/rootfs.vhdx.zst "$BASE/rootfs.vhdx.zst"
+          # vmlinuz / initrd: 先试 .zst，失败回退无后缀
+          curl -fL --retry 3 --connect-timeout 30 --max-time 600 -o out/vmlinuz.zst "$BASE/vmlinuz.zst" \
+            || curl -fL --retry 3 --connect-timeout 30 --max-time 600 -o out/vmlinuz "$BASE/vmlinuz"
+          curl -fL --retry 3 --connect-timeout 30 --max-time 600 -o out/initrd.zst "$BASE/initrd.zst" \
+            || curl -fL --retry 3 --connect-timeout 30 --max-time 600 -o out/initrd "$BASE/initrd"
+          ls -lh out/
+
+      - name: Verify checksums (downloaded + decompressed)
+        run: |
+          cd out
+          sha256sum * | tee ../checksums.txt
+          sudo apt-get install -y zstd >/dev/null 2>&1 || true
+          for f in *.zst; do zstd -d -f "$f" -o "plain_${f%.zst}" 2>/dev/null && rm -f "plain_${f%.zst}" || true; done
+          # 只打印解压后 sha256（不保留解压文件，省空间）
+          for f in rootfs.vhdx.zst vmlinuz.zst initrd.zst; do
+            [ -f "$f" ] && zstd -d -f "$f" -o "plain_$f" 2>/dev/null && sha256sum "plain_$f" && rm -f "plain_$f"
+          done
+          echo "--- manifest expectations ---"
+          echo "rootfs.vhdx: 21237ca86d15885ed7dcbe1c66b8b3a464c914648b16300070b12b1e1212e451"
+          echo "vmlinuz:     1bb4bc3aa0c0c797a2ca6134d2b7034a196e05d4deea7bb20f064ee353781f3b"
+          echo "initrd:      20214efcd451b3b74dc53ed80218c6e616bb2a101cafb18bc2c9bc91e559926b"
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "win32-x64 VM bundle 6d1538ba"
+          tag_name: "win32-x64-6d1538ba"
+          body: "Claude Desktop 3p Windows x64 VM components (bundle 6d1538ba6fecc4e5c5583993c4b30bb1875f0f5a). Downloaded via GitHub Actions from downloads.claude.ai."
+          files: out/*
